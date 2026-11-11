@@ -1,0 +1,68 @@
+name: Update recent public repositories
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-recent-repos.yml"
+      - "scripts/update_recent_repos.py"
+      - "README.md"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: profile-recent-repositories
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out profile repository
+        uses: actions/checkout@v4
+
+      - name: Build recent repositories section
+        env:
+          PROFILE_USERNAME: jeblove
+          RECENT_REPOS_LIMIT: "6"
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/update_recent_repos.py
+
+      # GitHub can disable cron workflows in public repositories after
+      # 60 days without repository activity. Keep a small heartbeat roughly
+      # monthly, without altering the README unless its actual list changes.
+      - name: Maintain monthly activity heartbeat
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from datetime import date, timedelta
+          from pathlib import Path
+
+          path = Path(".github/.profile-refresh-heartbeat")
+          today = date.today()
+          try:
+              last_update = date.fromisoformat(path.read_text().strip())
+          except (OSError, ValueError):
+              last_update = today - timedelta(days=31)
+
+          if (today - last_update).days >= 30:
+              path.write_text(today.isoformat() + "\n")
+          PY
+
+      - name: Commit only when necessary
+        shell: bash
+        run: |
+          git add README.md .github/.profile-refresh-heartbeat
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh recent repositories"
+          git push
