@@ -2,8 +2,6 @@
 
 ### 🔄 Recently Updated Repositories
 
-按最近代码推送时间自动排序的公开原创仓库（不包含 Fork、私有和归档仓库）。
-
 <!-- RECENT_REPOS:START -->
 | Repository | Description | Last push (UTC+8) |
 | --- | --- | --- |
